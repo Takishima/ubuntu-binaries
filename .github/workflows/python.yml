@@ -24,8 +24,18 @@ jobs:
         run: |
           echo "::set-output name=distro::$(cat /etc/os-release | grep UBUNTU_CODENAME | cut -d'=' -f2)"
           echo "::set-output name=arch::$(uname -p)"
+      
+      - name: Check if build is needed
+        id: build-required
+        run: |
+          if [ -n "$(cat python | grep ${{ steps.ubuntu-name.outputs.distro }} | grep ${{ matrix.python }})" ]; then
+            echo "::set-output name=value::0"
+          else
+            echo "::set-output name=value::1"
+          fi
 
       - name: Update system
+        if: ${{ steps.build-required.outputs.value }}
         run: sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y
 
       - name: Install pyenv dependencies
@@ -54,13 +64,24 @@ jobs:
           tar cvf ~/python-${{ matrix.python }}-${{ steps.ubuntu-name.outputs.arch }}.tar.gz \
           ${{ matrix.python }}
 
+      - name: Initialize mandatory git config
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email noreply@github.com
+
+      - name: Add Python ${{ matrix.python }} to repository file
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "${{ steps.ubuntu-name.outputs.distro }} ${{ matrix.python }}" >> python
+          cat python | sort -h | tee python
+          git add python
+          git commit --message "Add Python ${{ matrix.python }} for Ubuntu ${{ steps.ubuntu-name.outputs.distro }}"
+          git pull --rebase && git push
+
       - name: Create release
         env:
           tag: ${{ steps.ubuntu-name.outputs.distro }}-python-${{ matrix.python }}
           title: ${{ steps.ubuntu-name.outputs.distro }}-python-${{ matrix.python }}
-          file: python-${{ matrix.python }}-${{ steps.ubuntu-name.outputs.arch }}.tar.gz
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo $file
-          ls ~/
-          gh release create "${tag}" --title "${title}" ~/*.tar.gz
+        run: gh release create "${tag}" --title "${title}" ~/*.tar.gz

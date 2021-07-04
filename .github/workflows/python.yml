@@ -1,0 +1,66 @@
+name: Python
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_python:
+    strategy:
+      fail-fast: false
+      matrix:
+        python:
+          - 3.6.13
+          - 3.7.10
+          - 3.8.10
+          - 3.9.5
+
+    name: 'Build and install Python ${{ matrix.python }}'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - id: ubuntu-name
+        run: |
+          echo "::set-output name=distro::$(cat /etc/os-release | grep UBUNTU_CODENAME | cut -d'=' -f2)"
+          echo "::set-output name=arch::$(uname -p)"
+
+      - name: Update system
+        run: sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y
+
+      - name: Install pyenv dependencies
+        run: >
+          sudo apt-get install make build-essential libssl-dev zlib1g-dev
+          libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm
+          libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev
+          libffi-dev liblzma-dev
+
+      - name: Install pyenv
+        run: |
+          git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+          cd ~/.pyenv && src/configure && make -C src
+
+          echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bash_profile
+          echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bash_profile
+          echo 'eval "$(pyenv init --path)"' >> ~/.bash_profile
+
+      - name: Install Python ${{ matrix.python }}
+        run: pyenv install ${{ matrix.python }}
+        shell: bash -l {0}
+
+      - name: Package Python ${{ matrix.python }}
+        run: |
+          cd ~/.pyenv/versions
+          tar cvf ~/python-${{ matrix.python }}-${{ steps.ubuntu-name.outputs.arch }}.tar.gz \
+          ${{ matrix.python }}
+
+      - name: Create release
+        env:
+          tag: ${{ steps.ubuntu-name.outputs.distro }}-python-${{ matrix.python }}
+          title: ${{ steps.ubuntu-name.outputs.distro }}-python-${{ matrix.python }}
+          file: python-${{ matrix.python }}-${{ steps.ubuntu-name.outputs.arch }}.tar.gz
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo $file
+          ls ~/
+          gh release create "${tag}" --title "${title}" ~/*.tar.gz

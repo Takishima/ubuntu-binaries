@@ -29,9 +29,11 @@ jobs:
         id: build-required
         run: |
           if [ -n "$(cat python | grep ${{ steps.ubuntu-name.outputs.distro }} | grep ${{ matrix.python }})" ]; then
-            echo "::set-output name=value::0"
+            echo 'NO BUILD REQUIRED'
+            echo "::set-output name=value::false"
           else
-            echo "::set-output name=value::1"
+            echo 'BUILD REQUIRED'
+            echo "::set-output name=value::true"
           fi
 
       - name: Update system

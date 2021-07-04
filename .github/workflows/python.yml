@@ -38,7 +38,9 @@ jobs:
 
       - name: Update system
         if: steps.build-required.outputs.value
-        run: sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y
+        run: |
+          echo ${{ steps.build-required.outputs.value }}
+          sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y
 
       - name: Install pyenv dependencies
         run: >

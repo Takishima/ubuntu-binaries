@@ -9,10 +9,10 @@ jobs:
       fail-fast: false
       matrix:
         python:
-          - 3.6.13
-          - 3.7.10
-          - 3.8.10
-          - 3.9.5
+          - 3.6.14
+          - 3.7.11
+          - 3.8.11
+          - 3.9.6
 
     name: 'Build and install Python ${{ matrix.python }}'
     runs-on: ubuntu-latest
@@ -24,24 +24,24 @@ jobs:
         run: |
           echo "::set-output name=distro::$(cat /etc/os-release | grep UBUNTU_CODENAME | cut -d'=' -f2)"
           echo "::set-output name=arch::$(uname -p)"
-      
+
       - name: Check if build is needed
         id: build-required
         run: |
           if [ -n "$(cat python | grep ${{ steps.ubuntu-name.outputs.distro }} | grep ${{ matrix.python }})" ]; then
             echo 'NO BUILD REQUIRED'
-            echo "::set-output name=value::false"
+            echo "::set-output name=value::0"
           else
             echo 'BUILD REQUIRED'
-            echo "::set-output name=value::true"
+            echo "::set-output name=value::1"
           fi
 
       - name: Update system
-        if: ${{ steps.build-required.outputs.value == true }}
+        if: steps.build-required.outputs.value
         run: sudo apt update && sudo apt upgrade -y && sudo apt dist-upgrade -y
 
       - name: Install pyenv dependencies
-        if: ${{ steps.build-required.outputs.value == true }}
+        if: steps.build-required.outputs.value
         run: >
           sudo apt-get install make build-essential libssl-dev zlib1g-dev
           libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm
@@ -49,7 +49,7 @@ jobs:
           libffi-dev liblzma-dev
 
       - name: Install pyenv
-        if: ${{ steps.build-required.outputs.value == true }}
+        if: steps.build-required.outputs.value
         run: |
           git clone https://github.com/pyenv/pyenv.git ~/.pyenv
           cd ~/.pyenv && src/configure && make -C src
@@ -59,25 +59,25 @@ jobs:
           echo 'eval "$(pyenv init --path)"' >> ~/.bash_profile
 
       - name: Install Python ${{ matrix.python }}
-        if: ${{ steps.build-required.outputs.value == true }}
+        if: steps.build-required.outputs.value
         run: pyenv install ${{ matrix.python }}
         shell: bash -l {0}
 
       - name: Package Python ${{ matrix.python }}
-        if: ${{ steps.build-required.outputs.value == true }}
+        if: steps.build-required.outputs.value
         run: |
           cd ~/.pyenv/versions
           tar cvf ~/python-${{ matrix.python }}-${{ steps.ubuntu-name.outputs.arch }}.tar.gz \
           ${{ matrix.python }}
 
       - name: Initialize mandatory git config
-        if: ${{ steps.build-required.outputs.value == true }}
+        if: steps.build-required.outputs.value
         run: |
           git config user.name "GitHub Actions"
           git config user.email noreply@github.com
 
       - name: Add Python ${{ matrix.python }} to repository file
-        if: ${{ steps.build-required.outputs.value == true }}
+        if: steps.build-required.outputs.value
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -88,7 +88,7 @@ jobs:
           git pull --rebase && git push
 
       - name: Create release
-        if: ${{ steps.build-required.outputs.value == true }}
+        if: steps.build-required.outputs.value
         env:
           tag: ${{ steps.ubuntu-name.outputs.distro }}-python-${{ matrix.python }}
           title: ${{ steps.ubuntu-name.outputs.distro }}-python-${{ matrix.python }}
